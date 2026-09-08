@@ -1,0 +1,60 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Pages needs to read the repo and mint an id token for the deploy.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Let a running deploy finish rather than cancelling it mid publish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Type check, then the geometry and 3MF package assertions.
+      - run: npm run check
+
+      # Run first so the site URL is known and social card links come out absolute.
+      - id: pages
+        uses: actions/configure-pages@v5
+
+      - run: npm run build
+        env:
+          # A CNAME file pins the site to its own domain, so prefer that over
+          # the default Pages URL when one is set.
+          SITE_URL: ${{ vars.SITE_URL || steps.pages.outputs.base_url }}
+          # The deployed shortener. Override with a repository variable, or set
+          # it empty to drop short links and share full ones.
+          VITE_SHORTENER_URL: ${{ vars.SHORTENER_URL || 'https://emboss-shortener.nurdism.dev' }}
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,31 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "emboss-shortener",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-08",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // Created with: npx wrangler kv namespace create LINKS
+  // The preview namespace is the one `wrangler dev` writes to.
+  "kv_namespaces": [
+    {
+      "binding": "LINKS",
+      "id": "fe8c696f7b064e8bb9e7169ee531269f",
+      "preview_id": "db8f3e4767a546adbe4ec577c4dd96fc"
+    }
+  ],
+
+  // Served from the zone rather than a workers.dev subdomain.
+  "routes": [{ "pattern": "emboss-shortener.nurdism.dev", "custom_domain": true }],
+
+  "vars": {
+    // Comma separated origins allowed to call the shortener. Use * to allow any,
+    // though any localhost port is permitted regardless so local dev just works.
+    "ALLOWED_ORIGINS": "https://emboss.nurdism.dev"
+  },
+
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  }
+}

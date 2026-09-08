@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Emboss · multicolour 3MF sign generator</title>
+    <meta
+      name="description"
+      content="Design a multicolour sign in the browser and download a 3MF ready to print in Bambu Studio or OrcaSlicer. Text, icons, plate shapes, borders and mounting holes."
+    />
+    <meta name="theme-color" content="#14161a" />
+
+    <!-- Absolute URLs are filled in at load time, so this works from any host. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Emboss" />
+    <meta property="og:title" content="Emboss · multicolour 3MF sign generator" />
+    <meta
+      property="og:description"
+      content="Design a multicolour sign in the browser and download a 3MF ready to print in Bambu Studio or OrcaSlicer."
+    />
+    <meta property="og:image" content="og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="A three dimensional two colour sign on a print bed" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Emboss · multicolour 3MF sign generator" />
+    <meta
+      name="twitter:description"
+      content="Design a multicolour sign in the browser and download a 3MF ready to print."
+    />
+    <meta name="twitter:image" content="og.png" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%232f3640'/%3E%3Ctext x='16' y='23' font-family='sans-serif' font-size='18' font-weight='bold' text-anchor='middle' fill='%23f5b301'%3ES%3C/text%3E%3C/svg%3E"
+    />
+  </head>
+  <body>
+    <div id="app">
+      <aside class="panel">
+        <header class="panel-head">
+          <div class="title-row">
+            <div class="title">
+              <h1>Emboss</h1>
+              <p>Multicolour 3MF for Bambu Studio and OrcaSlicer</p>
+            </div>
+            <div class="head-actions">
+              <button id="collapse" type="button" class="icon" title="Hide the panel" aria-label="Hide the panel">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 6-6 6 6 6" /></svg>
+              </button>
+              <button id="undo" type="button" class="icon" title="Undo (Ctrl+Z)" aria-label="Undo">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5" /><path d="M4 9h10a6 6 0 0 1 0 12h-3" /></svg>
+              </button>
+              <button id="redo" type="button" class="icon" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 14 5-5-5-5" /><path d="M20 9H10a6 6 0 0 0 0 12h3" /></svg>
+              </button>
+              <button id="reset" type="button" class="icon" title="Start over" aria-label="Start over">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /></svg>
+              </button>
+            </div>
+          </div>
+          <div class="presets" id="presets"></div>
+        </header>
+
+        <div class="panes">
+
+        <details class="pane" open data-pane="text">
+          <summary><span class="pane-name">Text</span><span class="pane-sum" id="sum-text"></span></summary>
+          <div class="pane-body">
+          <label class="wide">
+            <span>Label</span>
+            <textarea id="text" rows="2" spellcheck="false"></textarea>
+          </label>
+          <label class="wide" for="fontToggle"><span>Font</span></label>
+          <button id="fontToggle" type="button" class="chosen" aria-expanded="false">
+            <span id="fontCurrent">DejaVu Sans Bold</span>
+            <em id="fontCount"></em>
+          </button>
+          <div id="fontPanel" class="drawer" hidden>
+            <input
+              id="fontSearch"
+              type="search"
+              placeholder="Search Google Fonts"
+              spellcheck="false"
+              autocomplete="off"
+            />
+            <div class="picker">
+              <ul id="fontList" role="listbox"></ul>
+            </div>
+          </div>
+          <div class="grid">
+            <label><span>Weight</span><select id="fontWeight"></select></label>
+            <label class="file"><span>Custom file</span>
+              <input id="fontFile" type="file" accept=".ttf,.otf,font/ttf,font/otf" />
+            </label>
+          </div>
+          <div class="grid">
+            <label><span>Size mm</span><input id="fontSize" type="number" min="1" step="0.5" /></label>
+            <label><span>Align</span>
+              <select id="align">
+                <option value="left">Left</option>
+                <option value="center">Centre</option>
+                <option value="right">Right</option>
+              </select>
+            </label>
+            <label><span>Tracking mm</span><input id="letterSpacing" type="number" step="0.1" /></label>
+            <label><span>Line spacing</span><input id="lineSpacing" type="number" min="0.5" step="0.05" /></label>
+            <label><span>Nudge X mm</span><input id="textOffsetX" type="number" step="0.5" /></label>
+            <label><span>Nudge Y mm</span><input id="textOffsetY" type="number" step="0.5" /></label>
+          </div>
+          </div>
+        </details>
+
+        <details class="pane" data-pane="artwork">
+          <summary><span class="pane-name">Artwork</span><span class="pane-sum" id="sum-artwork"></span></summary>
+          <div class="pane-body">
+          <label class="wide">
+            <span>Search icons <output id="iconCount"></output></span>
+            <input
+              id="iconSearch"
+              type="search"
+              placeholder="home, arrow, tools, warning"
+              spellcheck="false"
+              autocomplete="off"
+            />
+          </label>
+          <div class="icons" id="iconResults"></div>
+          <label class="wide">
+            <span>Or paste an icon ID</span>
+            <div class="dual">
+              <input
+                id="iconId"
+                type="text"
+                placeholder="mdi:home"
+                spellcheck="false"
+                autocomplete="off"
+              />
+              <button id="iconIdAdd" type="button">Add</button>
+            </div>
+          </label>
+          <p class="hint">
+            <a
+              href="https://icon-sets.iconify.design/"
+              target="_blank"
+              rel="noopener noreferrer"
+              >Browse every Iconify set</a
+            >, then copy an icon ID such as <code>mdi:home</code> and paste it above.
+          </p>
+          <label class="wide file">
+            <span>Or load an SVG file</span>
+            <input id="svgFile" type="file" accept=".svg,image/svg+xml" />
+          </label>
+          <div class="row">
+            <span id="svgName" class="hint">No artwork loaded</span>
+            <button id="svgClear" type="button" class="link">Remove</button>
+          </div>
+          <div class="grid">
+            <label><span>Size mm</span><input id="svgSize" type="number" min="1" step="1" /></label>
+            <label><span>Rotate deg</span><input id="svgRotation" type="number" step="5" /></label>
+            <label><span>Place</span>
+              <select id="svgPlacement">
+                <option value="above">Above text</option>
+                <option value="below">Below text</option>
+                <option value="left">Left of text</option>
+                <option value="right">Right of text</option>
+                <option value="manual">Manual</option>
+              </select>
+            </label>
+            <label><span>Gap mm</span><input id="svgGap" type="number" min="0" step="0.5" /></label>
+            <label><span>Nudge X mm</span><input id="svgOffsetX" type="number" step="0.5" /></label>
+            <label><span>Nudge Y mm</span><input id="svgOffsetY" type="number" step="0.5" /></label>
+          </div>
+          </div>
+        </details>
+
+        <details class="pane" open data-pane="plate">
+          <summary><span class="pane-name">Plate</span><span class="pane-sum" id="sum-plate"></span></summary>
+          <div class="pane-body">
+          <div class="grid">
+            <label><span>Shape</span>
+              <select id="plate">
+                <option value="rounded">Rounded rect</option>
+                <option value="rect">Rectangle</option>
+                <option value="square">Square</option>
+                <option value="circle">Circle</option>
+                <option value="ellipse">Ellipse</option>
+                <option value="pill">Pill</option>
+                <option value="triangle">Triangle</option>
+                <option value="hexagon">Hexagon</option>
+                <option value="octagon">Octagon</option>
+                <option value="stop">Stop sign</option>
+                <option value="shield">Shield</option>
+              </select>
+            </label>
+            <label><span>Corner r mm</span><input id="cornerRadius" type="number" min="0" step="0.5" /></label>
+          </div>
+          <label class="check"><input id="autoFit" type="checkbox" /><span>Fit plate to artwork</span></label>
+          <div class="grid">
+            <label><span>Padding mm</span><input id="padding" type="number" min="0" step="0.5" /></label>
+            <label class="spacer"></label>
+            <label><span id="widthLabel">Width mm</span><input id="width" type="number" min="1" step="1" /></label>
+            <label id="heightField"><span>Height mm</span><input id="height" type="number" min="1" step="1" /></label>
+          </div>
+          </div>
+        </details>
+
+        <details class="pane" data-pane="border">
+          <summary><span class="pane-name">Border</span><span class="pane-sum" id="sum-border"></span></summary>
+          <div class="pane-body">
+          <label class="wide"><span>Width mm</span><input id="borderWidth" type="number" /></label>
+          <label class="wide"><span>Inset from edge mm</span><input id="borderInset" type="number" /></label>
+          <p class="hint">
+            A rim following the plate outline, printed in the artwork colour at the
+            artwork depth. Zero width turns it off. Mounting holes move inside it.
+          </p>
+          </div>
+        </details>
+
+        <details class="pane" data-pane="depth">
+          <summary><span class="pane-name">Depth</span><span class="pane-sum" id="sum-depth"></span></summary>
+          <div class="pane-body">
+          <div class="grid">
+            <label><span>Style</span>
+              <select id="mode">
+                <option value="raised">Raised on top</option>
+                <option value="inlay">Inlaid flush</option>
+              </select>
+            </label>
+            <label class="spacer"></label>
+            <label><span>Plate mm</span><input id="baseDepth" type="number" min="0.2" step="0.2" /></label>
+            <label><span>Art mm</span><input id="artDepth" type="number" min="0.1" step="0.1" /></label>
+          </div>
+          <p class="hint" id="modeHint"></p>
+          </div>
+        </details>
+
+        <details class="pane" data-pane="mounting-holes">
+          <summary><span class="pane-name">Mounting holes</span><span class="pane-sum" id="sum-mounting-holes"></span></summary>
+          <div class="pane-body">
+          <div class="grid">
+            <label><span>Layout</span>
+              <select id="holes">
+                <option value="none">None</option>
+                <option value="top-center">Top centre</option>
+                <option value="top-corners">Top corners</option>
+                <option value="four-corners">Four corners</option>
+              </select>
+            </label>
+            <label class="spacer"></label>
+            <label><span>Diameter mm</span><input id="holeDiameter" type="number" min="0.5" step="0.5" /></label>
+            <label><span>Inset mm</span><input id="holeInset" type="number" min="0" step="0.5" /></label>
+          </div>
+          </div>
+        </details>
+
+        <details class="pane" data-pane="colours">
+          <summary><span class="pane-name">Colours</span><span class="pane-sum" id="sum-colours"></span></summary>
+          <div class="pane-body">
+          <label class="wide">
+            <span>Mode</span>
+            <select id="colorMode">
+              <option value="two-tone">Two tone</option>
+              <option value="per-element">A colour per element</option>
+            </select>
+          </label>
+          <div class="grid">
+            <label><span>Plate</span><input id="baseColor" type="color" /></label>
+            <label id="artColorField"><span>Artwork</span><input id="artColor" type="color" /></label>
+            <label id="textColorField" hidden><span>Text</span><input id="textColor" type="color" /></label>
+            <label id="iconColorField" hidden><span>Icon</span><input id="iconColor" type="color" /></label>
+            <label id="borderColorField" hidden><span>Border</span><input id="borderColor" type="color" /></label>
+          </div>
+          <p class="hint" id="slotHint"></p>
+          </div>
+        </details>
+
+        <details class="pane" data-pane="view">
+          <summary><span class="pane-name">View</span><span class="pane-sum" id="sum-view"></span></summary>
+          <div class="pane-body">
+          <p class="hint">
+            Drag to orbit, scroll to zoom. The buttons on the canvas fit the view,
+            look straight down, and turn the measurements on or off.
+          </p>
+          <p class="hint">
+            Copy link puts the whole sign in a URL, artwork included. An uploaded
+            font file is too large to travel with it.
+          </p>
+          </div>
+        </details>
+
+        <details class="pane" data-pane="export">
+          <summary><span class="pane-name">Export</span><span class="pane-sum" id="sum-export"></span></summary>
+          <div class="pane-body">
+          <div class="grid">
+            <label><span>File name</span><input id="name" type="text" /></label>
+            <label><span>Bed</span>
+              <select id="bed">
+                <option value="256x256">256 x 256</option>
+                <option value="180x180">180 x 180</option>
+                <option value="220x220">220 x 220</option>
+                <option value="350x350">350 x 350</option>
+              </select>
+            </label>
+            <label><span>Smoothness</span><input id="curveSegments" type="number" min="2" max="48" step="1" /></label>
+          </div>
+          </div>
+        </details>
+        </div>
+
+        <footer class="panel-foot">
+          <button id="download" type="button" class="primary">Download .3mf</button>
+          <button id="copyLink" type="button" title="Copy a link that restores this sign">Copy link</button>
+          <button id="shareToggle" type="button" class="icon" title="Share" aria-label="Share" aria-expanded="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="m8.6 10.5 6.8-4" /><path d="m8.6 13.5 6.8 4" /></svg>
+          </button>
+          <div id="shareMenu" class="share-menu" hidden></div>
+        </footer>
+        <div
+          id="resizer"
+          class="resizer"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize the panel"
+          tabindex="0"
+        ></div>
+      </aside>
+
+      <main class="stage">
+        <div id="viewport"></div>
+        <button id="expand" type="button" class="icon expand" title="Show the panel" aria-label="Show the panel" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 6 6 6-6 6" /></svg>
+        </button>
+        <div class="view-controls">
+          <button id="viewFit" type="button" class="icon" title="Fit to view" aria-label="Fit to view">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9V3h6" /><path d="M21 9V3h-6" /><path d="M3 15v6h6" /><path d="M21 15v6h-6" /></svg>
+          </button>
+          <button id="viewTop" type="button" class="icon" title="Look straight down" aria-label="Look straight down">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2" /></svg>
+          </button>
+          <button id="viewIso" type="button" class="icon" title="Angled view" aria-label="Angled view">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5Z" /><path d="m3 13 9 5 9-5" /></svg>
+          </button>
+          <button id="viewDims" type="button" class="icon" title="Dimensions" aria-label="Dimensions" aria-pressed="true">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h18" /><path d="m6 9-3 3 3 3" /><path d="m18 9 3 3-3 3" /></svg>
+          </button>
+        </div>
+        <div id="busy" class="busy" hidden></div>
+        <div class="overlay">
+          <div id="stats" class="stats"></div>
+          <div id="messages" class="messages"></div>
+        </div>
+      </main>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

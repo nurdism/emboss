@@ -1,0 +1,6 @@
+node_modules
+dist
+*.3mf
+.env
+.env.local
+worker/.wrangler
