@@ -221,6 +221,7 @@ function refreshSummaries(sign: { plateWidth: number; plateHeight: number }): vo
   )
   set('view', showDimensions ? 'Dimensions on' : 'Dimensions off')
   set('export', `${cfg.name || 'sign'}.3mf · ${cfg.bedX} mm bed`)
+  set('source', 'github.com/nurdism/emboss')
 }
 
 function refreshSliders(): void {
@@ -787,11 +788,73 @@ const writeStored = (key: string, value: string): void => {
 
 // --- output ----------------------------------------------------------------
 
+/**
+ * Errors live in their own slot rather than alongside the build warnings, which
+ * are replaced wholesale on every redraw. Reporting into that slot meant a
+ * failure could vanish before it was read.
+ */
 function report(error: unknown, fallback = 'Something went wrong.'): void {
-  const node = document.createElement('p')
-  node.className = 'error'
-  node.textContent = error instanceof Error ? error.message : fallback
-  messages.replaceChildren(node)
+  const alert = document.createElement('div')
+  alert.className = 'alert error'
+  const text = document.createElement('p')
+  text.textContent = error instanceof Error ? error.message : fallback
+  alert.append(text, dismissButton(alert))
+  el('alerts').replaceChildren(alert)
+}
+
+function dismissButton(alert: HTMLElement): HTMLButtonElement {
+  const close = document.createElement('button')
+  close.type = 'button'
+  close.textContent = 'Dismiss'
+  close.addEventListener('click', () => alert.remove())
+  return close
+}
+
+/**
+ * Copying after an await is unreliable. Chrome allows it, but Firefox and
+ * Safari treat the user gesture as spent by the time a network round trip has
+ * finished, and reject the write. So the async API is tried first, then the old
+ * synchronous command, and if neither lands the caller shows the text instead.
+ */
+async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text)
+    return true
+  } catch {
+    // Falls through to the command below.
+  }
+  try {
+    const field = document.createElement('textarea')
+    field.value = text
+    field.setAttribute('readonly', '')
+    field.style.cssText = 'position:fixed;top:0;left:-9999px;opacity:0'
+    document.body.append(field)
+    field.select()
+    const copied = document.execCommand('copy')
+    field.remove()
+    return copied
+  } catch {
+    return false
+  }
+}
+
+/** Always put the link somewhere it can be grabbed, copied or not. */
+function showLink(url: string, copied: boolean): void {
+  const alert = document.createElement('div')
+  alert.className = 'alert'
+  const text = document.createElement('p')
+  text.textContent = copied ? 'Short link copied' : 'Short link ready, copy it here'
+  const field = document.createElement('input')
+  field.type = 'text'
+  field.readOnly = true
+  field.value = url
+  field.addEventListener('focus', () => field.select())
+  alert.append(text, field, dismissButton(alert))
+  el('alerts').replaceChildren(alert)
+  if (!copied) {
+    field.focus()
+    field.select()
+  }
 }
 
 function note(text: string): void {
@@ -879,16 +942,11 @@ function setShareMenu(open: boolean): void {
  */
 async function copyShortLink(): Promise<void> {
   setShareMenu(false)
-  const button = el<HTMLButtonElement>('copyLink')
   try {
     const payload = window.location.hash.replace(/^#/, '')
     const id = await withBusy('Shortening link', shortenPayload(payload))
     const url = `${window.location.origin}${window.location.pathname}#${SHORT_PREFIX}${id}`
-    await navigator.clipboard.writeText(url)
-    button.textContent = 'Short link copied'
-    setTimeout(() => {
-      button.textContent = 'Copy link'
-    }, 2000)
+    showLink(url, await copyToClipboard(url))
   } catch (error) {
     report(error, 'Could not shorten that link. The full link still works.')
   }

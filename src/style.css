@@ -630,3 +630,98 @@ body.resizing { cursor: col-resize; user-select: none; }
   #app { grid-template-columns: 1fr !important; }
   .resizer { display: none; }
 }
+
+/* Alerts outlive a rebuild, so a failure is not wiped by the next redraw. */
+#alerts { pointer-events: auto; }
+
+#alerts .alert {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(27, 30, 36, 0.95);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 7px 9px;
+  max-width: 520px;
+}
+
+#alerts .alert.error { border-color: #ff6b6b; }
+#alerts .alert p { margin: 0; background: none; border: none; padding: 0; color: var(--text); }
+#alerts .alert.error p { color: #ff9b9b; }
+
+#alerts .alert input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 4px 6px;
+  font-size: 11px;
+}
+
+#alerts .alert button {
+  flex: 0 0 auto;
+  width: auto;
+  padding: 4px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  background: var(--panel-2);
+}
+
+#alerts .alert button:hover { border-color: var(--accent); }
+
+/* The header GitHub link is an anchor, so it needs the icon button styling. */
+a.icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--panel-2);
+  color: var(--text);
+}
+
+a.icon:hover { border-color: var(--accent); color: var(--accent); }
+
+a.icon svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Brand marks are solid shapes rather than line drawings. */
+svg.brand {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+  stroke: none;
+}
+
+.repo-links { display: flex; flex-direction: column; gap: 2px; }
+
+.repo-links a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  margin: 0 -8px;
+  border-radius: 5px;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 12px;
+}
+
+.repo-links a:hover { background: var(--panel-2); color: var(--accent); }
+
+.repo-links svg {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}

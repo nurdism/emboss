@@ -45,6 +45,20 @@
               <p>Multicolour 3MF for Bambu Studio and OrcaSlicer</p>
             </div>
             <div class="head-actions">
+              <a
+                class="icon"
+                href="https://github.com/nurdism/emboss"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Source on GitHub"
+                aria-label="Source on GitHub"
+              >
+                <svg viewBox="0 0 16 16" class="brand" aria-hidden="true">
+                  <path
+                    d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"
+                  />
+                </svg>
+              </a>
               <button id="collapse" type="button" class="icon" title="Hide the panel" aria-label="Hide the panel">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 6-6 6 6 6" /></svg>
               </button>
@@ -305,6 +319,28 @@
           </div>
           </div>
         </details>
+          <details class="pane" data-pane="source">
+            <summary><span class="pane-name">Source</span><span class="pane-sum" id="sum-source"></span></summary>
+            <div class="pane-body">
+              <div class="repo-links">
+                <a href="https://github.com/nurdism/emboss" target="_blank" rel="noopener noreferrer">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2 3 6.5 7 1-5 5 1.2 7L12 18l-6.2 3.5L7 14.5l-5-5 7-1L12 2Z" /></svg>
+                  Star on GitHub
+                </a>
+                <a href="https://github.com/nurdism/emboss/fork" target="_blank" rel="noopener noreferrer">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="4" r="2" /><circle cx="18" cy="4" r="2" /><circle cx="12" cy="20" r="2" /><path d="M6 6v3a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3V6" /><path d="M12 12v6" /></svg>
+                  Fork it
+                </a>
+                <a href="https://github.com/nurdism/emboss/issues" target="_blank" rel="noopener noreferrer">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 8v5" /><path d="M12 16.5v.01" /></svg>
+                  Report a problem
+                </a>
+              </div>
+              <p class="hint">
+                Free and open source. Pull requests welcome, especially new plate shapes.
+              </p>
+            </div>
+          </details>
         </div>
 
         <footer class="panel-foot">
@@ -347,6 +383,7 @@
         <div id="busy" class="busy" hidden></div>
         <div class="overlay">
           <div id="stats" class="stats"></div>
+          <div id="alerts" class="messages"></div>
           <div id="messages" class="messages"></div>
         </div>
       </main>
