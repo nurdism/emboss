@@ -702,6 +702,22 @@ check(
   `${withIcon.parts.length} parts, ${withIcon.triangles} triangles`,
 )
 
+console.log('\n--- every setting has a control ---')
+
+/**
+ * A setting nobody can reach is a setting that looks like it is not saving.
+ * Each one needs a control whose id matches its key, bar the two that share the
+ * bed picker and the font, which is chosen from a list rather than a field.
+ */
+const CONTROL_EXCEPTIONS = new Set(['bedX', 'bedY', 'fontId'])
+const markup = readFileSync(resolve(process.cwd(), 'index.html'), 'utf8')
+const ids = new Set([...markup.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]))
+const unreachable = (Object.keys(defaultConfig) as (keyof SignConfig)[]).filter(
+  (key) => !CONTROL_EXCEPTIONS.has(key) && !ids.has(key),
+)
+check('every setting has a control of its own', unreachable.length === 0, unreachable.join(', '))
+check('the bed picker and the font list are still there', ids.has('bed') && ids.has('fontToggle'))
+
 console.log('\n--- 3mf package ---')
 const bytes = buildThreeMF(
   raised.parts.map((part, index) => ({ name: part.name, mesh: part.mesh, extruder: index + 1 })),

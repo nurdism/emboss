@@ -332,6 +332,7 @@ function bindControls(): void {
     cfg.bedX = x
     cfg.bedY = y
     viewer.setBed(x, y)
+    recordStep()
     scheduleRebuild()
   })
 
@@ -786,6 +787,9 @@ function syncControls(): void {
     if (slider) slider.value = String(cfg[key])
   }
   el<HTMLSelectElement>('bed').value = `${cfg.bedX}x${cfg.bedY}`
+  // The grid is part of the design as much as any control is, and every restore
+  // path comes through here: a short link, an undo, a preset.
+  viewer.setBed(cfg.bedX, cfg.bedY)
   renderFontList()
   renderWeights()
 }
