@@ -39,6 +39,24 @@ export function svgArt(source: string, cfg: SignConfig): SvgArt {
     return { contours, warning: 'No closed outlines found in this SVG.' }
   }
 
+  fitArt(contours, cfg)
+
+  return {
+    contours,
+    warning: strokeOnly
+      ? 'This SVG has no filled shapes, so its outlines were extruded as if filled. Convert strokes to outlines for a cleaner result.'
+      : null,
+  }
+}
+
+/**
+ * Centre art on the origin, scale its longest side to cfg.svgSize, and turn it
+ * by the requested angle, in place. Whatever draws the outlines, an SVG or a QR
+ * code, they all land in the same millimetre space this way.
+ */
+export function fitArt(contours: Contour[], cfg: SignConfig): void {
+  if (contours.length === 0) return
+
   const bounds = contourBounds(contours)
   const size = bounds.getSize(new Vector2())
   const center = bounds.getCenter(new Vector2())
@@ -55,12 +73,5 @@ export function svgArt(source: string, cfg: SignConfig): SvgArt {
       point.x = x * cos - y * sin
       point.y = x * sin + y * cos
     }
-  }
-
-  return {
-    contours,
-    warning: strokeOnly
-      ? 'This SVG has no filled shapes, so its outlines were extruded as if filled. Convert strokes to outlines for a cleaner result.'
-      : null,
   }
 }

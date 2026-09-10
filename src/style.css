@@ -159,6 +159,8 @@ body {
 
 label { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 label > span { font-size: 11px; color: var(--muted); }
+/* A label with a live readout on it, such as a result count, sat at the far end. */
+label > span.with-count { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 label.wide { margin-bottom: 10px; }
 label.spacer { display: none; }
 

@@ -7,6 +7,8 @@ export interface FontChoice {
   weights: number[]
   /** Character set the file is cut for, for example latin or japanese. */
   subset: string
+  /** True when the family ships a drawn italic rather than needing a faux one. */
+  italic: boolean
 }
 
 export interface LoadedFont {
@@ -16,12 +18,12 @@ export interface LoadedFont {
 
 /** Faces shipped with the app so it still works with no network. */
 export const BUNDLED_FONTS: FontChoice[] = [
-  { id: 'bundled:DejaVuSans-Bold', family: 'DejaVu Sans Bold', category: 'bundled', weights: [700], subset: 'latin' },
-  { id: 'bundled:DejaVuSans', family: 'DejaVu Sans', category: 'bundled', weights: [400], subset: 'latin' },
-  { id: 'bundled:DejaVuSerif-Bold', family: 'DejaVu Serif Bold', category: 'bundled', weights: [700], subset: 'latin' },
-  { id: 'bundled:DejaVuSansMono-Bold', family: 'DejaVu Sans Mono Bold', category: 'bundled', weights: [700], subset: 'latin' },
-  { id: 'bundled:LiberationSans-Bold', family: 'Liberation Sans Bold', category: 'bundled', weights: [700], subset: 'latin' },
-  { id: 'bundled:LiberationSerif-Bold', family: 'Liberation Serif Bold', category: 'bundled', weights: [700], subset: 'latin' },
+  { id: 'bundled:DejaVuSans-Bold', family: 'DejaVu Sans Bold', category: 'bundled', weights: [700], subset: 'latin', italic: false },
+  { id: 'bundled:DejaVuSans', family: 'DejaVu Sans', category: 'bundled', weights: [400], subset: 'latin', italic: false },
+  { id: 'bundled:DejaVuSerif-Bold', family: 'DejaVu Serif Bold', category: 'bundled', weights: [700], subset: 'latin', italic: false },
+  { id: 'bundled:DejaVuSansMono-Bold', family: 'DejaVu Sans Mono Bold', category: 'bundled', weights: [700], subset: 'latin', italic: false },
+  { id: 'bundled:LiberationSans-Bold', family: 'Liberation Sans Bold', category: 'bundled', weights: [700], subset: 'latin', italic: false },
+  { id: 'bundled:LiberationSerif-Bold', family: 'Liberation Serif Bold', category: 'bundled', weights: [700], subset: 'latin', italic: false },
 ]
 
 const CATALOG_URL = 'https://api.fontsource.org/v1/fonts'
@@ -59,6 +61,7 @@ export function googleFonts(): Promise<FontChoice[]> {
           category: entry.category,
           weights: [...entry.weights].sort((a, b) => a - b),
           subset: entry.subsets.includes('latin') ? 'latin' : entry.defSubset,
+          italic: entry.styles.includes('italic'),
         }))
         .sort((a, b) => a.family.localeCompare(b.family)),
     )
@@ -77,22 +80,40 @@ export function preferredWeight(weights: number[]): number {
   return weights[0] ?? 400
 }
 
-export function fontFileUrl(choice: FontChoice, weight: number): string {
+export function fontFileUrl(choice: FontChoice, weight: number, italic = false): string {
   if (choice.id.startsWith('bundled:')) {
     return `${import.meta.env.BASE_URL}fonts/${choice.id.slice('bundled:'.length)}.ttf`
   }
-  return `https://cdn.jsdelivr.net/fontsource/fonts/${choice.id}@latest/${choice.subset}-${weight}-normal.ttf`
+  const style = italic ? 'italic' : 'normal'
+  return `https://cdn.jsdelivr.net/fontsource/fonts/${choice.id}@latest/${choice.subset}-${weight}-${style}.ttf`
 }
 
 const cache = new Map<string, opentype.Font>()
 
-export async function loadFont(choice: FontChoice, weight: number): Promise<opentype.Font> {
-  const url = fontFileUrl(choice, weight)
+/**
+ * Fetch a face, preferring the family's drawn italic when one is asked for and
+ * the catalogue says it exists. A family can still be missing the italic at a
+ * particular weight, so that falls back to the upright cut rather than failing
+ * the sign. `text.ts` leans an upright face itself when it has to.
+ */
+export async function loadFont(
+  choice: FontChoice,
+  weight: number,
+  italic = false,
+): Promise<opentype.Font> {
+  if (italic && choice.italic) {
+    const drawn = await fetchFont(fontFileUrl(choice, weight, true), choice.family).catch(() => null)
+    if (drawn) return drawn
+  }
+  return fetchFont(fontFileUrl(choice, weight), choice.family)
+}
+
+async function fetchFont(url: string, family: string): Promise<opentype.Font> {
   const cached = cache.get(url)
   if (cached) return cached
 
   const response = await fetch(url)
-  if (!response.ok) throw new Error(`Could not load ${choice.family} (${response.status})`)
+  if (!response.ok) throw new Error(`Could not load ${family} (${response.status})`)
   const font = opentype.parse(await response.arrayBuffer())
   cache.set(url, font)
   return font

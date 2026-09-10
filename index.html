@@ -6,7 +6,7 @@
     <title>Emboss · multicolour 3MF sign generator</title>
     <meta
       name="description"
-      content="Design a multicolour sign in the browser and download a 3MF ready to print in Bambu Studio or OrcaSlicer. Text, icons, plate shapes, borders and mounting holes."
+      content="Design a multicolour sign in the browser and download a 3MF ready to print in Bambu Studio or OrcaSlicer. Text, icons, QR codes, plate shapes, borders and mounting holes."
     />
     <meta name="theme-color" content="#14161a" />
 
@@ -119,9 +119,24 @@
             </label>
             <label><span>Tracking mm</span><input id="letterSpacing" type="number" step="0.1" /></label>
             <label><span>Line spacing</span><input id="lineSpacing" type="number" min="0.5" step="0.05" /></label>
+            <label><span>Case</span>
+              <select id="textCase">
+                <option value="as-typed">As typed</option>
+                <option value="upper">UPPERCASE</option>
+                <option value="lower">lowercase</option>
+                <option value="title">Title Case</option>
+                <option value="small-caps">Small Caps</option>
+              </select>
+            </label>
+            <label><span>Stretch %</span><input id="textStretch" type="number" min="50" max="200" step="1" /></label>
             <label><span>Nudge X mm</span><input id="textOffsetX" type="number" step="0.5" /></label>
             <label><span>Nudge Y mm</span><input id="textOffsetY" type="number" step="0.5" /></label>
           </div>
+          <div class="grid">
+            <label class="check"><input id="italic" type="checkbox" /><span>Italic</span></label>
+            <label class="check"><input id="underline" type="checkbox" /><span>Underline</span></label>
+          </div>
+          <p class="hint" id="italicHint" hidden></p>
           </div>
         </details>
 
@@ -129,7 +144,7 @@
           <summary><span class="pane-name">Artwork</span><span class="pane-sum" id="sum-artwork"></span></summary>
           <div class="pane-body">
           <label class="wide">
-            <span>Search icons <output id="iconCount"></output></span>
+            <span class="with-count">Search icons <output id="iconCount"></output></span>
             <input
               id="iconSearch"
               type="search"
@@ -164,6 +179,31 @@
             <span>Or load an SVG file</span>
             <input id="svgFile" type="file" accept=".svg,image/svg+xml" />
           </label>
+          <label class="wide">
+            <span class="with-count">Or encode a QR code <output id="qrCount"></output></span>
+            <input
+              id="qrText"
+              type="text"
+              placeholder="https://example.com"
+              spellcheck="false"
+              autocomplete="off"
+            />
+          </label>
+          <div class="grid">
+            <label><span>Error correction</span>
+              <select id="qrEcc">
+                <option value="L">L, lightest</option>
+                <option value="M">M, normal</option>
+                <option value="Q">Q, sturdy</option>
+                <option value="H">H, toughest</option>
+              </select>
+            </label>
+          </div>
+          <p class="hint">
+            Anything in the box becomes the artwork, in place of an icon. Empty it
+            to put the icon back. Heavier error correction shrugs off a rough print
+            but needs more modules for the same text, so each one comes out smaller.
+          </p>
           <div class="row">
             <span id="svgName" class="hint">No artwork loaded</span>
             <button id="svgClear" type="button" class="link">Remove</button>
@@ -264,6 +304,13 @@
             <label><span>Diameter mm</span><input id="holeDiameter" type="number" min="0.5" step="0.5" /></label>
             <label><span>Inset mm</span><input id="holeInset" type="number" min="0" step="0.5" /></label>
           </div>
+          <label class="check"><input id="holesThroughAll" type="checkbox" /><span>Cut through everything</span></label>
+          <p class="hint">
+            A hole normally gives up rather than land on the artwork or the rim.
+            Cut through everything bores it anyway, taking a ring of the artwork
+            with it so the two colours never meet at the hole edge. A hole that
+            would fall off the plate is still dropped.
+          </p>
           </div>
         </details>
 
@@ -281,7 +328,7 @@
             <label><span>Plate</span><input id="baseColor" type="color" /></label>
             <label id="artColorField"><span>Artwork</span><input id="artColor" type="color" /></label>
             <label id="textColorField" hidden><span>Text</span><input id="textColor" type="color" /></label>
-            <label id="iconColorField" hidden><span>Icon</span><input id="iconColor" type="color" /></label>
+            <label id="iconColorField" hidden><span id="iconColorName">Icon</span><input id="iconColor" type="color" /></label>
             <label id="borderColorField" hidden><span>Border</span><input id="borderColor" type="color" /></label>
           </div>
           <p class="hint" id="slotHint"></p>

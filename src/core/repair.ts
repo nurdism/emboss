@@ -1,5 +1,5 @@
 import { Vector2 } from 'three'
-import polygonClipping, { type Geom, type Ring } from 'polygon-clipping'
+import polygonClipping, { type MultiPolygon, type Ring } from 'polygon-clipping'
 import { buildContourTree, forestToRegions, type Contour } from './contours'
 
 /**
@@ -19,12 +19,8 @@ import { buildContourTree, forestToRegions, type Contour } from './contours'
 export function repairContours(contours: Contour[]): Contour[] {
   if (contours.length === 0) return contours
 
-  const regions = forestToRegions(buildContourTree(contours))
-  if (regions.length === 0) return contours
-
-  const polygons: Geom[] = regions.map((region) =>
-    [region.outer, ...region.holes].map(closedRing),
-  )
+  const polygons = toGeom(contours)
+  if (polygons.length === 0) return contours
 
   try {
     const united = polygonClipping.union(polygons[0], ...polygons.slice(1))
@@ -39,6 +35,43 @@ export function repairContours(contours: Contour[]): Contour[] {
   } catch {
     return contours
   }
+}
+
+/**
+ * Cut a set of holes out of a set of rings.
+ *
+ * Nesting one ring inside another can only describe a hole that lands wholly
+ * within a shape. A mounting hole told to bore through everything is just as
+ * likely to clip the edge of a letter, so the boolean does the work and hands
+ * back whatever is left, including nothing at all when a hole swallows a shape
+ * whole.
+ */
+export function subtractContours(contours: Contour[], holes: Contour[]): Contour[] {
+  if (contours.length === 0 || holes.length === 0) return contours
+
+  const subject = toGeom(contours)
+  if (subject.length === 0) return contours
+
+  try {
+    const cut = polygonClipping.difference(subject, ...holes.map((hole) => [[closedRing(hole)]]))
+    const out: Contour[] = []
+    for (const polygon of cut) {
+      for (const ring of polygon) {
+        const contour = openRing(ring)
+        if (contour.length >= 3) out.push(contour)
+      }
+    }
+    return out
+  } catch {
+    return contours
+  }
+}
+
+/** Rings nested into solids and holes, in the shape the clipper wants them. */
+function toGeom(contours: Contour[]): MultiPolygon {
+  return forestToRegions(buildContourTree(contours)).map((region) =>
+    [region.outer, ...region.holes].map(closedRing),
+  )
 }
 
 /** The clipper wants the first point repeated at the end. */

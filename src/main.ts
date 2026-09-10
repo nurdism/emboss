@@ -14,6 +14,7 @@ import { LOCKED_ASPECT, SMOOTH_SHAPES } from './core/plate'
 import { PRESETS, type Preset } from './core/presets'
 import { decodeState, readStateFromUrl, writeStateToUrl } from './core/share'
 import { expandId, SHORT_PREFIX, shorteningAvailable, shortenPayload } from './core/shortlink'
+import { isItalicFace } from './core/text'
 import { buildThreeMF } from './core/threemf'
 import { defaultConfig, type SignConfig } from './core/types'
 import { initPreviews, previewOnView } from './ui/fontpreview'
@@ -65,6 +66,10 @@ const BOUND_KEYS = [
   'letterSpacing',
   'lineSpacing',
   'align',
+  'textCase',
+  'italic',
+  'underline',
+  'textStretch',
   'textOffsetX',
   'textOffsetY',
   'svgSize',
@@ -73,6 +78,8 @@ const BOUND_KEYS = [
   'svgOffsetX',
   'svgOffsetY',
   'svgRotation',
+  'qrText',
+  'qrEcc',
   'plate',
   'autoFit',
   'padding',
@@ -87,6 +94,7 @@ const BOUND_KEYS = [
   'holes',
   'holeDiameter',
   'holeInset',
+  'holesThroughAll',
   'colorMode',
   'baseColor',
   'artColor',
@@ -123,6 +131,7 @@ const RANGES: Partial<Record<BoundKey, [number, number, number]>> = {
   fontSize: [1, 120, 0.5],
   letterSpacing: [-5, 20, 0.1],
   lineSpacing: [0.5, 3, 0.05],
+  textStretch: [50, 200, 1],
   textOffsetX: [-100, 100, 0.5],
   textOffsetY: [-100, 100, 0.5],
   svgSize: [1, 200, 1],
@@ -190,6 +199,13 @@ const SHAPE_NAMES: Record<string, string> = {
   shield: 'Shield',
 }
 
+const CASE_NAMES: Record<string, string> = {
+  upper: 'UPPERCASE',
+  lower: 'lowercase',
+  title: 'Title Case',
+  'small-caps': 'Small Caps',
+}
+
 const HOLE_NAMES: Record<string, string> = {
   none: 'None',
   'top-center': 'Top centre',
@@ -203,8 +219,14 @@ function refreshSummaries(sign: { plateWidth: number; plateHeight: number }): vo
     el(`sum-${pane}`).textContent = value
   }
   const family = currentChoice()?.family ?? 'No font'
-  set('text', `${family} · ${cfg.fontSize} mm`)
-  set('artwork', svgName ?? 'None')
+  const treatments = [
+    CASE_NAMES[cfg.textCase] ?? '',
+    cfg.italic ? 'italic' : '',
+    cfg.underline ? 'underlined' : '',
+    cfg.textStretch === 100 ? '' : `${cfg.textStretch}% wide`,
+  ].filter(Boolean)
+  set('text', [`${family} · ${cfg.fontSize} mm`, ...treatments].join(' · '))
+  set('artwork', artworkName() ?? 'None')
   set(
     'plate',
     `${SHAPE_NAMES[cfg.plate] ?? cfg.plate} · ${sign.plateWidth.toFixed(0)} x ${sign.plateHeight.toFixed(0)} mm`,
@@ -214,7 +236,12 @@ function refreshSummaries(sign: { plateWidth: number; plateHeight: number }): vo
     'depth',
     `${cfg.mode === 'raised' ? 'Raised' : 'Inlaid'} · ${cfg.baseDepth} + ${cfg.artDepth} mm`,
   )
-  set('mounting-holes', HOLE_NAMES[cfg.holes] ?? cfg.holes)
+  set(
+    'mounting-holes',
+    `${HOLE_NAMES[cfg.holes] ?? cfg.holes}${
+      cfg.holes !== 'none' && cfg.holesThroughAll ? ' · through everything' : ''
+    }`,
+  )
   set(
     'colours',
     cfg.colorMode === 'per-element' ? 'A colour per element' : 'Two tone',
@@ -222,6 +249,21 @@ function refreshSummaries(sign: { plateWidth: number; plateHeight: number }): vo
   set('view', showDimensions ? 'Dimensions on' : 'Dimensions off')
   set('export', `${cfg.name || 'sign'}.3mf · ${cfg.bedX} mm bed`)
   set('source', 'github.com/nurdism/emboss')
+}
+
+/**
+ * Italics come from the family's own drawn cut where there is one. Everything
+ * else is leaned by hand, which is worth saying rather than leaving the user to
+ * wonder why a serif looks off.
+ */
+function refreshItalicHint(): void {
+  const hint = el('italicHint')
+  const faux = cfg.italic && font !== null && !isItalicFace(font)
+  hint.hidden = !faux
+  if (faux) {
+    hint.textContent =
+      'This face has no italic of its own, so the outlines are leaned instead. Pick a family that ships one for a drawn italic.'
+  }
 }
 
 function refreshSliders(): void {
@@ -237,6 +279,7 @@ function refreshColorFields(parts: { name: string }[]): void {
   el('artColorField').hidden = perElement
   el('textColorField').hidden = !perElement
   el('iconColorField').hidden = !perElement
+  el('iconColorName').textContent = hasQr() ? 'QR code' : 'Icon'
   el('borderColorField').hidden = !perElement
   el('slotHint').textContent = parts
     .map((part, index) => `${index + 1} ${part.name.toLowerCase()}`)
@@ -274,7 +317,7 @@ function bindControls(): void {
       if (slider && source !== slider) slider.value = String(cfg[key])
       if (slider && source === slider) input.value = String(cfg[key])
       recordStep()
-      if (key === 'fontWeight') void applyFont()
+      if (key === 'fontWeight' || key === 'italic') void applyFont()
       else scheduleRebuild()
     }
     input.addEventListener('input', () => commit(input))
@@ -301,6 +344,7 @@ function bindControls(): void {
   el('svgClear').addEventListener('click', () => {
     svgSource = null
     svgName = null
+    clearQr()
     el<HTMLInputElement>('svgFile').value = ''
     for (const button of el('iconResults').querySelectorAll('button')) {
       button.setAttribute('aria-pressed', 'false')
@@ -497,7 +541,7 @@ async function applyFont(): Promise<void> {
     return
   }
   try {
-    font = await withBusy(`Loading ${choice.family}`, loadFont(choice, cfg.fontWeight))
+    font = await withBusy(`Loading ${choice.family}`, loadFont(choice, cfg.fontWeight, cfg.italic))
     loadedFontId = choice.id
   } catch (error) {
     font = null
@@ -534,6 +578,8 @@ async function loadCustomFont(input: HTMLInputElement): Promise<void> {
       category: 'uploaded',
       weights: [cfg.fontWeight],
       subset: 'latin',
+      // Whatever the file is, it is the only cut of it there is.
+      italic: false,
     })
     renderFontList()
     renderWeights()
@@ -549,10 +595,24 @@ async function loadSvg(input: HTMLInputElement): Promise<void> {
   if (!file) return
   svgSource = await file.text()
   svgName = file.name
+  clearQr()
   el('svgName').textContent = file.name
   recordStep()
   scheduleRebuild()
 }
+
+/** A code in the box takes the artwork slot, whatever else is loaded. */
+const hasQr = (): boolean => cfg.qrText.trim().length > 0
+
+/** Choosing an icon or a file is a decision to stop showing a code. */
+function clearQr(): void {
+  if (!cfg.qrText) return
+  cfg.qrText = ''
+  el<HTMLInputElement>('qrText').value = ''
+}
+
+/** What the panel calls the artwork currently on the sign. */
+const artworkName = (): string | null => (hasQr() ? 'QR code' : svgName)
 
 // --- icons -----------------------------------------------------------------
 
@@ -619,6 +679,7 @@ async function addIconById(): Promise<void> {
   try {
     svgSource = await withBusy(`Loading ${name}`, fetchIconSvg(name))
     svgName = name
+    clearQr()
     field.value = ''
     el<HTMLInputElement>('svgFile').value = ''
     recordStep()
@@ -632,6 +693,7 @@ async function chooseIcon(hit: IconHit): Promise<void> {
   try {
     svgSource = await withBusy('Loading icon', fetchIconSvg(hit.name))
     svgName = hit.name
+    clearQr()
     el<HTMLInputElement>('svgFile').value = ''
     for (const button of el('iconResults').querySelectorAll('button')) {
       button.setAttribute('aria-pressed', String(button.title === hit.name))
@@ -742,6 +804,8 @@ function buildPresets(): void {
 
 async function applyPreset(preset: Preset): Promise<void> {
   Object.assign(cfg, preset.cfg)
+  // A preset that declares its artwork speaks for the code as well as the icon.
+  if (preset.icon !== undefined && preset.cfg.qrText === undefined) cfg.qrText = ''
   if (preset.icon === null) {
     svgSource = null
     svgName = null
@@ -981,7 +1045,7 @@ function rebuild(): void {
 
   refreshSliders()
   refreshAspectLock()
-  el('svgName').textContent = svgName ?? 'No artwork loaded'
+  el('svgName').textContent = artworkName() ?? 'No artwork loaded'
   const linkLength = writeStateToUrl({ cfg, svg: svgSource, svgName })
 
   try {
@@ -994,6 +1058,10 @@ function rebuild(): void {
     )
     refreshColorFields(sign.parts)
     refreshSummaries(sign)
+    refreshItalicHint()
+    el('qrCount').textContent = sign.qr
+      ? `${sign.qr.modules} modules, ${sign.qr.moduleSize.toFixed(2)} mm each`
+      : ''
     stats.textContent = `${sign.plateWidth.toFixed(1)} x ${sign.plateHeight.toFixed(
       1,
     )} x ${sign.totalHeight.toFixed(1)} mm  ·  ${sign.triangles.toLocaleString()} triangles`

@@ -18,7 +18,8 @@ import {
   mountingHoleContours,
   plateContour,
 } from './plate'
-import { repairContours } from './repair'
+import { qrArt, type QrArt } from './qr'
+import { repairContours, subtractContours } from './repair'
 import { svgArt } from './svg'
 import { textContours } from './text'
 import type { PlateShape, SignConfig } from './types'
@@ -38,6 +39,8 @@ export interface SignBuild {
   plateHeight: number
   totalHeight: number
   triangles: number
+  /** Set when the artwork is a QR code, so the panel can report its grain. */
+  qr: { modules: number; moduleSize: number } | null
   warnings: string[]
 }
 
@@ -65,22 +68,42 @@ export interface BuildInput {
   svgSource: string | null
 }
 
+/** Clear margin a QR code wants on every side, in modules. */
+const QUIET_ZONE = 4
+
 export function buildSign({ cfg, font, svgSource }: BuildInput): SignBuild {
   const warnings: string[] = []
   const text = font && cfg.text.trim().length > 0 ? textContours(font, cfg) : []
 
+  // A QR code takes the artwork slot outright. It is the point of the sign it
+  // is on, and pairing one with an icon only starves both of room.
   let svg: Contour[] = []
-  if (svgSource) {
+  let qr: QrArt | null = null
+  const qrText = cfg.qrText.trim()
+
+  if (qrText) {
+    try {
+      qr = qrArt(qrText, cfg)
+      svg = qr.contours
+    } catch (error) {
+      warnings.push(error instanceof Error ? error.message : String(error))
+    }
+  } else if (svgSource) {
     const parsed = svgArt(svgSource, cfg)
     if (parsed.warning) warnings.push(parsed.warning)
     svg = parsed.contours
+  }
+
+  if (svg.length > 0) {
     placeSvg(svg, text, cfg)
     if (
       cfg.svgPlacement === 'manual' &&
       text.length > 0 &&
       overlaps(contourBounds(text), contourBounds(svg))
     ) {
-      warnings.push('The SVG overlaps the text, which cuts holes where they cross.')
+      warnings.push(
+        `${qr ? 'The QR code' : 'The SVG'} overlaps the text, which cuts holes where they cross.`,
+      )
     }
   }
 
@@ -146,10 +169,51 @@ export function buildSign({ cfg, font, svgSource }: BuildInput): SignBuild {
     }
   }
 
+  let qrReport: SignBuild['qr'] = null
+
+  if (qr && iconRings.length > 0) {
+    // The code is square, so either side of its bounds gives the module pitch.
+    const box = contourBounds(iconRings)
+    const module = Math.max(...box.getSize(new Vector2()).toArray()) / qr.modules
+    qrReport = { modules: qr.modules, moduleSize: module }
+    if (module < 0.8) {
+      warnings.push(
+        `Each QR module is about ${module.toFixed(
+          2,
+        )} mm across, under a typical nozzle width. Enlarge the code, or shorten the text so it needs fewer modules.`,
+      )
+    }
+    // A code needs a clear margin around it to be found at all. The plate
+    // supplies it, or the rim does once one is on.
+    const field = border ? contourBounds([border.inner]) : null
+    const quiet = Math.min(
+      (field ? field.max.x : plateWidth / 2) - box.max.x,
+      box.min.x - (field ? field.min.x : -plateWidth / 2),
+      (field ? field.max.y : plateHeight / 2) - box.max.y,
+      box.min.y - (field ? field.min.y : -plateHeight / 2),
+    )
+    if (quiet < module * QUIET_ZONE) {
+      warnings.push(
+        `The QR code has ${Math.max(0, quiet).toFixed(1)} mm of clear space around it and wants ${(
+          module * QUIET_ZONE
+        ).toFixed(1)} mm. Add padding or shrink the code, or scanners may miss it.`,
+      )
+    }
+    // Scanners read a code as dark on light and mostly refuse the inverse.
+    const codeColor = cfg.colorMode === 'per-element' ? cfg.iconColor : cfg.artColor
+    if (luminance(codeColor) > luminance(cfg.baseColor)) {
+      warnings.push(
+        'This code is lighter than the plate behind it, and most scanners will not read an inverted code. Swap the two colours.',
+      )
+    }
+  }
+
   // Holes cannot sit in the rim itself, so push them past it when one is on.
-  const holeInset = border
-    ? Math.max(cfg.holeInset, Math.max(MIN_BORDER_INSET, cfg.borderInset) + cfg.borderWidth + cfg.holeDiameter / 2 + 1.5)
-    : cfg.holeInset
+  // Unless they have been told to bore through it, which is the whole point.
+  const holeInset =
+    border && !cfg.holesThroughAll
+      ? Math.max(cfg.holeInset, Math.max(MIN_BORDER_INSET, cfg.borderInset) + cfg.borderWidth + cfg.holeDiameter / 2 + 1.5)
+      : cfg.holeInset
 
   const placement = mountingHoleContours(
     cfg.holes,
@@ -159,6 +223,7 @@ export function buildSign({ cfg, font, svgSource }: BuildInput): SignBuild {
     cfg.holeDiameter,
     holeInset,
     art,
+    cfg.holesThroughAll,
   )
   const holeNodes: ContourNode[] = placement.contours.map((points) => ({ points, children: [] }))
 
@@ -166,11 +231,20 @@ export function buildSign({ cfg, font, svgSource }: BuildInput): SignBuild {
     warnings.push(
       `${placement.dropped} mounting hole${
         placement.dropped > 1 ? 's had' : ' had'
-      } nowhere safe to go. Enlarge the plate, add padding, or shrink the holes.`,
+      } nowhere safe to go. Enlarge the plate, add padding, or shrink the holes${
+        cfg.holesThroughAll ? '' : ', or let them cut through everything'
+      }.`,
     )
   }
 
-  const artForest = buildContourTree(art)
+  // A hole boring through everything takes a bite out of whatever it lands on,
+  // and it can clip the edge of a letter rather than sitting neatly inside one,
+  // so the boolean does the cutting rather than ring nesting.
+  const bore = (rings: Contour[]): Contour[] =>
+    subtractContours(rings, placement.clearances)
+  const artRings = bore(art)
+
+  const artForest = buildContourTree(artRings)
   if (content.some((c) => c.some((p) => !pointInPolygon(p, plate)))) {
     warnings.push('Artwork reaches past the plate edge. Increase the size or reduce the art.')
   }
@@ -232,11 +306,11 @@ export function buildSign({ cfg, font, svgSource }: BuildInput): SignBuild {
 
   if (cfg.colorMode === 'per-element') {
     // Each element gets its own body, and so its own filament slot.
-    addPart('Text', textRings, cfg.textColor)
-    addPart('Icon', iconRings, cfg.iconColor)
-    if (border) addPart('Border', [border.outer, border.inner], cfg.borderColor)
+    addPart('Text', bore(textRings), cfg.textColor)
+    addPart(qr ? 'QR code' : 'Icon', bore(iconRings), cfg.iconColor)
+    if (border) addPart('Border', bore([border.outer, border.inner]), cfg.borderColor)
   } else {
-    addPart('Artwork', art, cfg.artColor)
+    addPart('Artwork', artRings, cfg.artColor)
   }
 
   if (parts.length === 1) {
@@ -249,7 +323,9 @@ export function buildSign({ cfg, font, svgSource }: BuildInput): SignBuild {
       } x ${cfg.bedY} mm bed.`,
     )
   }
-  if (cfg.mode === 'inlay' && artForest.length > 0) {
+  // A QR code reports its own module size, which says the same thing in terms
+  // the user can act on, so the generic detail gauge is left to other artwork.
+  if (cfg.mode === 'inlay' && artForest.length > 0 && !qr) {
     const thinnest = minFeature(forestContours(artForest))
     if (thinnest < 0.8) {
       warnings.push(
@@ -266,6 +342,7 @@ export function buildSign({ cfg, font, svgSource }: BuildInput): SignBuild {
     plateHeight,
     totalHeight,
     triangles: parts.reduce((total, part) => total + triangleCount(part.mesh), 0),
+    qr: qrReport,
     warnings,
   }
 }
@@ -327,6 +404,21 @@ function placeSvg(svg: Contour[], text: Contour[], cfg: SignConfig): void {
       point.y += dy
     }
   }
+}
+
+/**
+ * Rough perceived brightness of a `#rrggbb` colour, 0 to 1. Anything the colour
+ * inputs cannot produce reads as mid grey, so it never triggers a warning on
+ * its own.
+ */
+function luminance(color: string): number {
+  const hex = /^#([0-9a-f]{6})$/i.exec(color.trim())
+  if (!hex) return 0.5
+  const value = parseInt(hex[1], 16)
+  const r = (value >> 16) & 0xff
+  const g = (value >> 8) & 0xff
+  const b = value & 0xff
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255
 }
 
 const overlaps = (a: Box2, b: Box2): boolean =>

@@ -302,13 +302,37 @@ function insideArtwork(pt: Vector2, artwork: Contour[]): boolean {
   return inside
 }
 
-function distanceToSegment(p: Vector2, a: Vector2, b: Vector2): number {
+/** The point on segment a..b that lies closest to p. */
+function closestOnSegment(p: Vector2, a: Vector2, b: Vector2): Vector2 {
   const dx = b.x - a.x
   const dy = b.y - a.y
   const lengthSq = dx * dx + dy * dy
   const t =
     lengthSq < 1e-12 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lengthSq))
-  return Math.hypot(p.x - (a.x + dx * t), p.y - (a.y + dy * t))
+  return new Vector2(a.x + dx * t, a.y + dy * t)
+}
+
+const distanceToSegment = (p: Vector2, a: Vector2, b: Vector2): number =>
+  p.distanceTo(closestOnSegment(p, a, b))
+
+/**
+ * Put a point inside a convex region, leaving it alone if it is already there
+ * and moving it to the nearest part of the boundary if it is not.
+ */
+function clampInto(point: Vector2, region: Contour): Vector2 {
+  if (pointInPolygon(point, region)) return point
+
+  let best = region[0]
+  let nearest = Infinity
+  for (let i = 0; i < region.length; i++) {
+    const candidate = closestOnSegment(point, region[i], region[(i + 1) % region.length])
+    const distance = point.distanceToSquared(candidate)
+    if (distance < nearest) {
+      nearest = distance
+      best = candidate
+    }
+  }
+  return best
 }
 
 function clearsArtwork(centre: Vector2, clearance: number, artwork: Contour[]): boolean {
@@ -323,29 +347,15 @@ function clearsArtwork(centre: Vector2, clearance: number, artwork: Contour[]): 
   return true
 }
 
-const holeFits = (centre: Vector2, radius: number, plate: Contour): boolean =>
-  circle(centre.x, centre.y, radius, 16).every((p) => pointInPolygon(p, plate))
-
-/**
- * Corner insets are measured off the bounding box, which puts them outside a
- * round or angled plate. Walk the hole back towards the centre until it clears
- * the outline so every plate shape gets usable holes.
- */
-function pullInside(centre: Vector2, radius: number, plate: Contour): Vector2 | null {
-  if (holeFits(centre, radius, plate)) return centre
-  let low = 0
-  let high = 1
-  for (let i = 0; i < 24; i++) {
-    const mid = (low + high) / 2
-    if (holeFits(new Vector2(centre.x * mid, centre.y * mid), radius, plate)) low = mid
-    else high = mid
-  }
-  const fitted = new Vector2(centre.x * low, centre.y * low)
-  return holeFits(fitted, radius, plate) ? fitted : null
-}
-
 export interface HolePlacement {
   contours: Contour[]
+  /**
+   * Widened discs, one per hole, for cutting out of whatever a hole has been
+   * told to bore through. The extra radius leaves a wall of plate around the
+   * hole rather than letting the second colour run right up to its edge. Empty
+   * unless holes were asked to go through everything.
+   */
+  clearances: Contour[]
   /** Holes that were asked for but had nowhere safe to go. */
   dropped: number
 }
@@ -363,39 +373,68 @@ export function mountingHoleContours(
   diameter: number,
   inset: number,
   artwork: Contour[] = [],
+  throughAll = false,
 ): HolePlacement {
-  if (mode === 'none' || diameter <= 0) return { contours: [], dropped: 0 }
+  if (mode === 'none' || diameter <= 0) return { contours: [], clearances: [], dropped: 0 }
 
   const radius = diameter / 2
   // Leave a wall between the hole and whatever is next to it.
   const clearance = radius + Math.min(1.2, radius)
-  const x = Math.max(0, width / 2 - inset)
-  const y = Math.max(0, height / 2 - inset)
+
+  /**
+   * The inset is a distance in from the edge, so it can carry a hole past the
+   * middle and on towards the far side. An axis that a layout mirrors a pair
+   * across stops at the middle instead: going further would only swap the two
+   * holes over and sit them on top of each other.
+   */
+  const from = (edge: number, mirrored: boolean) =>
+    mirrored ? Math.max(0, edge - inset) : edge - inset
 
   const centres: Vector2[] = []
-  if (mode === 'top-center') centres.push(new Vector2(0, y))
-  if (mode === 'top-corners') centres.push(new Vector2(-x, y), new Vector2(x, y))
+  if (mode === 'top-center') centres.push(new Vector2(0, from(height / 2, false)))
+  if (mode === 'top-corners') {
+    const x = from(width / 2, true)
+    const y = from(height / 2, false)
+    centres.push(new Vector2(-x, y), new Vector2(x, y))
+  }
   if (mode === 'four-corners') {
+    const x = from(width / 2, true)
+    const y = from(height / 2, true)
     centres.push(new Vector2(-x, y), new Vector2(x, y), new Vector2(-x, -y), new Vector2(x, -y))
   }
 
+  // Where a hole centre is allowed to sit. The inset is a distance in from the
+  // plate outline, so the region it may land in is the outline pushed in by
+  // that much, which is the same half-plane intersection the border is built
+  // from. Measuring off the bounding box instead, and walking a stray hole back
+  // towards the middle, threw the inset away entirely on every plate that is
+  // not a rectangle: a stop sign or a circle pinned all of them to the outline.
+  const room = offsetInward(plate, clearance)
+  if (!room) return { contours: [], clearances: [], dropped: centres.length }
+  // An inset deeper than the plate can take leaves the hole as deep as it goes
+  // rather than refusing it.
+  const field = (inset > clearance ? offsetInward(plate, inset) : null) ?? room
+
   const placed: Vector2[] = []
   const contours: Contour[] = []
+  const clearances: Contour[] = []
   let dropped = 0
 
   for (const centre of centres) {
-    const fitted = pullInside(centre, clearance, plate)
+    const fitted = clampInto(centre, field)
+    // Boring through everything means artwork is no longer a reason to give up
+    // on a hole. Landing on another one still is.
     const collides =
-      fitted === null ||
       placed.some((other) => other.distanceTo(fitted) < diameter + 1) ||
-      !clearsArtwork(fitted, clearance, artwork)
+      (!throughAll && !clearsArtwork(fitted, clearance, artwork))
     if (collides) {
       dropped++
       continue
     }
     placed.push(fitted)
     contours.push(circle(fitted.x, fitted.y, radius))
+    if (throughAll) clearances.push(circle(fitted.x, fitted.y, clearance))
   }
 
-  return { contours, dropped }
+  return { contours, clearances, dropped }
 }

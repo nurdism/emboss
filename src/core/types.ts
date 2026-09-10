@@ -18,12 +18,24 @@ export type HoleMode = 'none' | 'top-center' | 'top-corners' | 'four-corners'
 export type Align = 'left' | 'center' | 'right'
 
 /**
+ * Case treatment applied to the label as it is drawn. The typed text is left
+ * alone, so switching back to "as typed" always gets the original wording.
+ */
+export type TextCase = 'as-typed' | 'upper' | 'lower' | 'title' | 'small-caps'
+
+/**
  * Two tone puts every raised or inlaid feature on one filament. Per element
  * gives the text, the icon and the border a slot each.
  */
 export type ColorMode = 'two-tone' | 'per-element'
 
 export type SvgPlacement = 'above' | 'below' | 'left' | 'right' | 'manual'
+
+/**
+ * QR error correction. Higher levels survive more damage, and more of a printed
+ * code's fuzziness, at the cost of a denser matrix for the same text.
+ */
+export type QrEcc = 'L' | 'M' | 'Q' | 'H'
 
 export interface SignConfig {
   /** Sign label. Newlines split lines. */
@@ -37,6 +49,12 @@ export interface SignConfig {
   /** Baseline-to-baseline distance as a multiple of font size. */
   lineSpacing: number
   align: Align
+  textCase: TextCase
+  /** A true italic where the family has one, a lean on the outlines otherwise. */
+  italic: boolean
+  underline: boolean
+  /** Horizontal scale as a percentage. 100 leaves the face as drawn. */
+  textStretch: number
   textOffsetX: number
   textOffsetY: number
 
@@ -49,6 +67,10 @@ export interface SignConfig {
   svgOffsetX: number
   svgOffsetY: number
   svgRotation: number
+
+  /** Text or URL to encode. Anything here becomes the artwork, in place of an icon. */
+  qrText: string
+  qrEcc: QrEcc
 
   plate: PlateShape
   /** Size the plate to the artwork instead of using width/height. */
@@ -70,6 +92,11 @@ export interface SignConfig {
   holes: HoleMode
   holeDiameter: number
   holeInset: number
+  /**
+   * Bore each mounting hole through whatever it lands on, artwork and rim
+   * included, instead of dropping a hole that has no clear spot.
+   */
+  holesThroughAll: boolean
 
   colorMode: ColorMode
   baseColor: string
@@ -95,6 +122,10 @@ export const defaultConfig: SignConfig = {
   letterSpacing: 0,
   lineSpacing: 1.25,
   align: 'center',
+  textCase: 'as-typed',
+  italic: false,
+  underline: false,
+  textStretch: 100,
   textOffsetX: 0,
   textOffsetY: 0,
 
@@ -104,6 +135,9 @@ export const defaultConfig: SignConfig = {
   svgOffsetX: 0,
   svgOffsetY: 0,
   svgRotation: 0,
+
+  qrText: '',
+  qrEcc: 'M',
 
   plate: 'rounded',
   autoFit: true,
@@ -122,6 +156,7 @@ export const defaultConfig: SignConfig = {
   holes: 'none',
   holeDiameter: 4,
   holeInset: 6,
+  holesThroughAll: false,
 
   colorMode: 'two-tone',
   baseColor: '#2f3640',

@@ -116,6 +116,31 @@ export const PRESETS: Preset[] = [
     icon: null,
   },
   {
+    name: 'QR code',
+    cfg: {
+      text: 'SCAN ME',
+      qrText: 'https://example.com',
+      qrEcc: 'M',
+      plate: 'rounded',
+      mode: 'raised',
+      autoFit: true,
+      padding: 10,
+      cornerRadius: 5,
+      fontSize: 9,
+      svgSize: 44,
+      svgPlacement: 'below',
+      svgGap: 4,
+      baseDepth: 2.4,
+      artDepth: 0.8,
+      borderWidth: 0,
+      holes: 'none',
+      // A code is read as dark on light, so the plate is the pale one here.
+      baseColor: '#f2f4f8',
+      artColor: '#17181b',
+    },
+    icon: null,
+  },
+  {
     name: 'Shelf label',
     cfg: {
       text: 'M3 x 12',
